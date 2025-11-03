@@ -92,24 +92,61 @@
 </div>
 
 <script>
-const proxyUrl = "http://localhost:4000/api/workflows";
+const PROXY_URL_BASE = "http://localhost:5678/home/workflows";
 let workflows = [];
 
+// NEW: Helper function to correctly call the backend proxy and handle errors
+async function callProxyApi(path, method='GET', body = null) {
+  const url = PROXY_URL_BASE + path;
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  };
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url, options);
+
+  if (!res.ok) {
+      try {
+          const errorData = await res.json();
+          throw new Error(errorData.error || `HTTP error! Status: ${res.status}`);
+      } catch (e) {
+          throw new Error(`HTTP error! Status: ${res.status} when accessing ${url}`);
+      }
+  }
+
+  // Handle 204 No Content responses
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+      return {};
+  }
+
+  return res.json();
+}
+
+
+// Loads data from the proxy (GET /api/workflows)
 async function loadWorkflows() {
   const grid = document.getElementById('workflowGrid');
+  // NOTE: There is no 'Settings' button implemented in the provided code,
+  // so the 'Failed to fetch the settings' issue is a design limitation.
+  // The 'New Workflow' button also has no function implemented yet.
   grid.innerHTML = '<p>Loading workflows...</p>';
   try {
-    const res = await fetch(proxyUrl);
-    const data = await res.json();
+    const data = await callProxyApi('');
     workflows = data.data || [];
-
     renderWorkflows();
   } catch (err) {
-    grid.innerHTML = '<p style="color:red;">Failed to load workflows.</p>';
-    console.error(err);
+    grid.innerHTML = `<p style="color:red;">🔴 Failed to load workflows: ${err.message}</p>`;
+    console.error("Error in loadWorkflows:", err);
   }
 }
 
+// Renders filtered workflows
 function renderWorkflows() {
   const grid = document.getElementById('workflowGrid');
   const searchText = document.getElementById('searchInput').value.toLowerCase();
@@ -117,7 +154,9 @@ function renderWorkflows() {
   const filterInactive = document.getElementById('filterInactive').checked;
 
   const filtered = workflows.filter(w => {
-    const matchesSearch = w.name.toLowerCase().includes(searchText);
+    // Check for null/undefined name property
+    const name = w.name || 'Untitled';
+    const matchesSearch = name.toLowerCase().includes(searchText);
     const matchesFilter = (filterActive && w.active) || (filterInactive && !w.active);
     return matchesSearch && matchesFilter;
   });
@@ -127,10 +166,11 @@ function renderWorkflows() {
     return;
   }
 
+  // Uses the actual implemented functions below
   grid.innerHTML = filtered.map(w => `
     <div class="workflow-card" id="workflow-${w.id}">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px;">
-        <h2 style="font-size:1.2rem; font-weight:600; margin:0;">${w.name}</h2>
+        <h2 style="font-size:1.2rem; font-weight:600; margin:0;">${w.name || 'Untitled'}</h2>
         <span class="status-pill ${w.active ? 'status-active':'status-inactive'}">${w.active ? 'Active':'Inactive'}</span>
       </div>
       <div style="flex-grow:1;">
@@ -139,28 +179,74 @@ function renderWorkflows() {
       </div>
       <div style="display:flex; justify-content:flex-end; padding-top:15px; border-top:1px solid #EEEEEE;">
         <button class="action-button" title="Run Workflow" onclick="runWorkflow('${w.id}')"><i class="fas fa-play"></i></button>
-        <button class="action-button" title="${w.active ? 'Deactivate':'Activate'} Workflow" onclick="toggleWorkflow('${w.id}')"><i class="fas fa-power-off" style="color:${w.active?'':'var(--color-success)'}"></i></button>
+        <button class="action-button" title="${w.active ? 'Deactivate':'Activate'} Workflow" onclick="toggleWorkflow('${w.id}', ${w.active})"><i class="fas fa-power-off" style="color:${w.active?'var(--color-failure)':'var(--color-success)'}"></i></button>
         <button class="action-button" title="View History" onclick="viewHistory('${w.id}')"><i class="fas fa-history"></i></button>
       </div>
     </div>
   `).join('');
 }
 
-// Example actions
-function runWorkflow(id) { alert('Running workflow: ' + id); }
-function toggleWorkflow(id) { alert('Toggling workflow: ' + id); }
-function viewHistory(id) {
-  const modal = document.getElementById('historyModal');
-  document.getElementById('historyContent').innerHTML = `<h2>Execution History for workflow ${id}</h2><p>(Example content)</p>`;
-  modal.style.display='flex';
+// **IMPLEMENTED** - Sends POST request to the proxy server to run a workflow
+async function runWorkflow(id) {
+  try {
+    await callProxyApi(`/${id}/run`, 'POST');
+    alert('✅ Run successfully triggered for workflow: ' + id);
+  } catch (e) {
+    alert('❌ Failed to trigger run: ' + e.message);
+  }
 }
 
-// Modals
+// **IMPLEMENTED** - Sends POST request to the proxy server to toggle a workflow
+async function toggleWorkflow(id, active) {
+  const action = active ? 'deactivate' : 'activate';
+  try {
+    // Send the *desired* new state to the proxy
+    await callProxyApi(`/${id}/toggle`, 'POST', { active: !active });
+    alert(`✅ Successfully ${action}d workflow ${id}. Reloading...`);
+    loadWorkflows(); // Reload to update status in the view
+  } catch (e) {
+    alert('❌ Failed to toggle workflow: ' + e.message);
+  }
+}
+
+// **IMPLEMENTED** - Sends GET request to the proxy server to view executions
+async function viewHistory(id) {
+  const modal = document.getElementById('historyModal');
+  const content = document.getElementById('historyContent');
+  content.innerHTML = `<h2>Execution History for workflow ${id}</h2><p>Loading...</p>`;
+  modal.style.display='flex';
+
+  try {
+    const res = await callProxyApi(`/${id}/executions`);
+    const list = res.data || res;
+    content.innerHTML = `
+      <h2>Execution History for workflow ${id}</h2>
+      <button onclick="closeModal('historyModal')">Close</button>
+      <pre>${JSON.stringify(list, null, 2)}</pre>`;
+  } catch (e) {
+    content.innerHTML = `
+      <h2>❌ Error fetching history for workflow ${id}</h2>
+      <button onclick="closeModal('historyModal')">Close</button>
+      <p style="color:red;">${e.message}</p>`;
+  }
+}
+
+// Helper function for modals (kept from original)
 function closeModal(id) { document.getElementById(id).style.display='none'; }
 
+// Event listeners (kept from original)
 document.getElementById('searchInput').addEventListener('input', renderWorkflows);
 document.getElementById('filterActive').addEventListener('change', renderWorkflows);
 document.getElementById('filterInactive').addEventListener('change', renderWorkflows);
+document.querySelector('.btn-primary').addEventListener('click', () => {
+    alert('Functionality to create a New Workflow is not yet implemented.');
+});
+// The 'Settings' link has no function and will show a generic error if clicked.
+document.querySelector('nav a[href="#"]:nth-child(2)').addEventListener('click', (e) => {
+    e.preventDefault();
+    alert('Settings fetching failed because the functionality is not yet implemented.');
+});
+
 
 loadWorkflows();
 </script>
