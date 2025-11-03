@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>n8n Workflow Manager Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+
+<style>
+  :root {
+    --color-primary: hsl(14, 98%, 56%);
+    --color-success: hsl(140, 50%, 45%);
+    --color-failure: hsl(350, 70%, 55%);
+    --color-background: #F9FAFB;
+    --color-surface: #FFFFFF;
+    --color-text-dark: #333333;
+    --color-text-light: #9AA5B1;
+    --shadow-soft: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    --shadow-hover: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.05);
+    --radius-default: 12px;
+  }
+  body { font-family:'Inter','Roboto',sans-serif; background-color: var(--color-background); color: var(--color-text-dark); margin:0; padding-top:60px; transition:background-color 0.3s; }
+  .navbar { position: fixed; top:0; left:0; width:100%; height:60px; background-color: var(--color-surface); box-shadow: var(--shadow-soft); display:flex; align-items:center; justify-content:space-between; padding:0 24px; z-index:1000; }
+  .logo-text { font-size:1.5rem; font-weight:700; color:var(--color-primary); }
+  .main-content { padding:24px; }
+  .workflow-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:24px; }
+  .workflow-card { background-color: var(--color-surface); border-radius: var(--radius-default); box-shadow: var(--shadow-soft); padding:20px; transition:all 0.3s ease; display:flex; flex-direction:column; }
+  .workflow-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+  .status-pill { display:inline-block; padding:4px 10px; border-radius:9999px; font-size:0.85rem; font-weight:600; margin-left:10px; }
+  .status-active { background-color: var(--color-success); color:white; }
+  .status-inactive { background-color: var(--color-text-light); color: var(--color-surface); }
+  .action-button { background-color:transparent; border:none; color: var(--color-text-dark); cursor:pointer; padding:8px; border-radius:6px; transition: background-color 0.2s; margin-left:8px; }
+  .action-button:hover { background-color: rgba(0,0,0,0.05); }
+  .btn-primary { background-color: var(--color-primary); color:white; padding:10px 15px; border-radius:8px; font-weight:600; transition: background-color 0.2s; }
+  .btn-primary:hover { background-color:hsl(14,85%,50%); }
+  .search-input { padding:8px 12px; border:1px solid #ccc; border-radius:8px; font-size:1rem; width:250px; }
+  .text-subtle { color: var(--color-text-light); font-size:0.9rem; }
+
+  /* Modal styling */
+  .modal { position:fixed; top:0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.4); display:none; justify-content:center; align-items:center; z-index:2000; }
+  .modal-content { background-color: var(--color-surface); padding:30px; border-radius: var(--radius-default); box-shadow: var(--shadow-hover); max-width:600px; width:90%; max-height:90vh; overflow-y:auto; }
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <div style="display:flex; align-items:center;">
+    <i class="fas fa-cubes" style="color: var(--color-primary); font-size:1.8rem; margin-right:10px;"></i>
+    <span class="logo-text">n8n Manager</span>
+  </div>
+  <nav style="display:flex; gap:20px; font-weight:600;">
+    <a href="#" style="color: var(--color-text-dark); text-decoration:none; border-bottom:2px solid var(--color-primary); padding-bottom:4px;">Workflows</a>
+    <a href="#" id="settingsLink" style="color: var(--color-text-light); text-decoration:none; padding-bottom:4px;">Settings</a>
+  </nav>
+  <div style="display:flex; align-items:center; gap:15px;">
+    <input type="search" placeholder="Search workflows..." class="search-input" id="searchInput">
+    <button class="action-button"><i class="fas fa-moon"></i></button>
+  </div>
+</header>
+
+<main class="main-content">
+  <section style="width:100%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+      <h1 style="font-size:1.8rem;">Workflows</h1>
+      <button class="btn-primary" id="newWorkflowButton"><i class="fas fa-plus" style="margin-right:5px;"></i> New Workflow</button>
+    </div>
+    <div class="workflow-grid" id="workflowGrid">
+      <p>Loading workflows...</p>
+    </div>
+  </section>
+</main>
+
+<div id="historyModal" class="modal">
+  <div class="modal-content" id="historyContent"></div>
+</div>
+<div id="confirmModal" class="modal">
+  <div class="modal-content" id="confirmContent"></div>
+</div>
+
+<script>
+const PROXY_URL_BASE = "http://localhost:4000/api/workflows";
+let workflows = [];
+
+/* 🔗 Centralized API Handler */
+async function callProxyApi(path, method='GET', body=null) {
+  const url = PROXY_URL_BASE + path;
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let msg = await res.text();
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+  return res.json().catch(() => ({}));
+}
+
+/* 📦 Fetch Workflows */
+async function loadWorkflows() {
+  const grid = document.getElementById('workflowGrid');
+  grid.innerHTML = '<p>Loading workflows...</p>';
+  try {
+    const data = await callProxyApi('');
+    workflows = data.data || [];
+    renderWorkflows();
+  } catch (err) {
+    grid.innerHTML = `<p style="color:red;">❌ Failed to load workflows: ${err.message}</p>`;
+  }
+}
+
+/* 🧩 Render Workflows */
+function renderWorkflows() {
+  const grid = document.getElementById('workflowGrid');
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = workflows.filter(w => (w.name || '').toLowerCase().includes(query));
+
+  if (!filtered.length) return grid.innerHTML = '<p>No workflows found.</p>';
+
+  grid.innerHTML = filtered.map(w => `
+    <div class="workflow-card">
+      <div style="display:flex; justify-content:space-between;">
+        <h2>${w.name || 'Untitled'}</h2>
+        <span class="status-pill ${w.active?'status-active':'status-inactive'}">${w.active?'Active':'Inactive'}</span>
+      </div>
+      <p class="text-subtle">🆔 ${w.id}</p>
+      <p class="text-subtle">📅 Created: ${new Date(w.createdAt || '').toLocaleString()}</p>
+      <p class="text-subtle">🕓 Updated: ${new Date(w.updatedAt || '').toLocaleString()}</p>
+      <div style="display:flex; justify-content:flex-end; border-top:1px solid #eee; padding-top:10px;">
+        <button class="action-button" title="Run" onclick="runWorkflow('${w.id}')"><i class="fas fa-play"></i></button>
+        <button class="action-button" title="Toggle" onclick="toggleWorkflow('${w.id}', ${w.active})"><i class="fas fa-power-off" style="color:${w.active?'var(--color-failure)':'var(--color-success)'}"></i></button>
+        <button class="action-button" title="History" onclick="viewHistory('${w.id}')"><i class="fas fa-history"></i></button>
+        <button class="action-button" title="Details" onclick="viewDetails('${w.id}')"><i class="fas fa-info-circle"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ▶️ Run Workflow */
+async function runWorkflow(id) {
+  try {
+    await callProxyApi(`/${id}/run`, 'POST');
+    alert('✅ Workflow triggered successfully');
+  } catch (err) {
+    alert('❌ Failed: ' + err.message);
+  }
+}
+
+/* 🔄 Toggle Activation */
+async function toggleWorkflow(id, active) {
+  try {
+    await callProxyApi(`/${id}/toggle`, 'POST', { active: !active });
+    alert(`Workflow ${!active ? 'activated' : 'deactivated'}`);
+    loadWorkflows();
+  } catch (err) {
+    alert('❌ Failed: ' + err.message);
+  }
+}
+
+/* 🕓 View History */
+async function viewHistory(id) {
+  const modal = document.getElementById('historyModal');
+  const content = document.getElementById('historyContent');
+  modal.style.display = 'flex';
+  content.innerHTML = `<h2>History for ${id}</h2><p>Loading...</p>`;
+
+  try {
+    const data = await callProxyApi(`/${id}/executions`);
+    const list = data.data || [];
+    if (!list.length) {
+      content.innerHTML = `<h2>No executions yet.</h2><button onclick="closeModal('historyModal')">Close</button>`;
+      return;
+    }
+
+    content.innerHTML = `
+      <h2>Execution History</h2>
+      <button onclick="closeModal('historyModal')">Close</button>
+      <div style="margin-top:10px;">
+        ${list.map(exe => `
+          <div style="padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
+            <p><b>ID:</b> ${exe.id}</p>
+            <p>Status: ${exe.finished ? '✅ Success' : '⚠️ Failed'}</p>
+            <p>Start: ${new Date(exe.startedAt).toLocaleString()}</p>
+            <p>End: ${exe.stoppedAt ? new Date(exe.stoppedAt).toLocaleString() : '—'}</p>
+          </div>
+        `).join('')}
+      </div>`;
+  } catch (err) {
+    content.innerHTML = `<p style="color:red;">Error loading history: ${err.message}</p>`;
+  }
+}
+
+/* 🧠 View Workflow Details */
+function viewDetails(id) {
+  const wf = workflows.find(w => w.id === id);
+  const modal = document.getElementById('confirmModal');
+  const content = document.getElementById('confirmContent');
+  modal.style.display = 'flex';
+  content.innerHTML = `
+    <h2>Workflow Details</h2>
+    <p><b>Name:</b> ${wf.name}</p>
+    <p><b>ID:</b> ${wf.id}</p>
+    <p><b>Status:</b> ${wf.active ? '🟢 Active' : '🔴 Inactive'}</p>
+    <p><b>Created:</b> ${new Date(wf.createdAt || '').toLocaleString()}</p>
+    <p><b>Updated:</b> ${new Date(wf.updatedAt || '').toLocaleString()}</p>
+    <button onclick="closeModal('confirmModal')">Close</button>`;
+}
+
+/* 🧩 Settings Modal */
+function openSettings() {
+  const modal = document.getElementById('confirmModal');
+  const content = document.getElementById('confirmContent');
+  modal.style.display = 'flex';
+  content.innerHTML = `
+    <h2>⚙️ Settings</h2>
+    <label>API Base URL:</label>
+    <input id="apiBaseInput" type="text" value="http://localhost:4000/api/workflows" style="width:100%;padding:8px;margin-bottom:10px;"/>
+    <label>Auto-Refresh (sec):</label>
+    <input id="refreshInterval" type="number" value="0" min="0" style="width:100%;padding:8px;margin-bottom:10px;"/>
+    <button class="btn-primary" onclick="applySettings()">Save</button>
+    <button style="margin-left:10px;" onclick="closeModal('confirmModal')">Close</button>
+  `;
+}
+
+/* 💾 Apply Settings */
+function applySettings() {
+  const newUrl = document.getElementById('apiBaseInput').value.trim();
+  const interval = parseInt(document.getElementById('refreshInterval').value);
+  if (newUrl) {
+    window.PROXY_URL_BASE = newUrl;
+    alert('✅ Settings updated!');
+    closeModal('confirmModal');
+  }
+  if (interval > 0) {
+    setInterval(loadWorkflows, interval * 1000);
+  }
+}
+
+/* ➕ New Workflow Modal */
+function openNewWorkflow() {
+  const modal = document.getElementById('confirmModal');
+  const content = document.getElementById('confirmContent');
+  modal.style.display = 'flex';
+  content.innerHTML = `
+    <h2>Create New Workflow</h2>
+    <label>Name:</label>
+    <input id="wfName" type="text" placeholder="Enter workflow name" style="width:100%;padding:8px;margin-bottom:10px;"/>
+    <label>Active:</label>
+    <select id="wfActive" style="width:100%;padding:8px;margin-bottom:15px;">
+      <option value="true">Active</option>
+      <option value="false">Inactive</option>
+    </select>
+    <button class="btn-primary" onclick="createWorkflow()">Create</button>
+    <button style="margin-left:10px;" onclick="closeModal('confirmModal')">Cancel</button>`;
+}
+
+/* 🆕 Create Workflow */
+async function createWorkflow() {
+  const name = document.getElementById('wfName').value;
+  const active = document.getElementById('wfActive').value === 'true';
+  try {
+    await callProxyApi('', 'POST', { name, active, nodes: [], connections: {} });
+    alert('✅ Workflow created!');
+    closeModal('confirmModal');
+    loadWorkflows();
+  } catch (err) {
+    alert('❌ Failed: ' + err.message);
+  }
+}
+
+/* 🧹 Helpers */
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+
+/* 🔗 Event Bindings */
+document.getElementById('searchInput').addEventListener('input', renderWorkflows);
+document.getElementById('settingsLink').addEventListener('click', e => { e.preventDefault(); openSettings(); });
+document.getElementById('newWorkflowButton').addEventListener('click', openNewWorkflow);
+
+/* 🚀 Init */
+loadWorkflows();
+</script>
+
+</body>
+</html

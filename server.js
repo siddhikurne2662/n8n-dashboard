@@ -1,103 +1,149 @@
 import express from "express";
 import fetch from "node-fetch";
-import cors from "cors";
 import dotenv from "dotenv";
+import cors from "cors";
+
 dotenv.config();
-
 const app = express();
+const PORT = process.env.PORT || 4000;
+
 app.use(cors());
-// IMPORTANT FIX: Use middleware to parse JSON request bodies
 app.use(express.json());
+app.use(express.static("public")); // serves your index.html, script.js, etc.
 
-const PORT = 4000;
-// CORRECTED: Define the full n8n API base URL using the correct /api/v1 path
-const n8nApiUrl = `${process.env.N8N_URL}/api/v1`;
-
+// -------------------------------------------------------------
+// 🔐 Auth Header Helper
+// -------------------------------------------------------------
 const getAuthHeaders = () => ({
-  Authorization:
-    "Basic " +
-    Buffer.from(
-      `${process.env.N8N_USER}:${process.env.N8N_PASS}`
-    ).toString("base64"),
-  'Content-Type': 'application/json',
+  "X-N8N-API-KEY": process.env.N8N_API_KEY,
+  "Content-Type": "application/json",
 });
 
-// Helper function to handle fetch boilerplate and error checking
-const proxyN8nRequest = async (path, method, body = null) => {
-    const url = `${n8nApiUrl}${path}`;
-    const response = await fetch(url, {
-        method,
-        headers: getAuthHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
+// -------------------------------------------------------------
+// 🧱 ROUTES
+// -------------------------------------------------------------
+
+// ✅ 1. Fetch all workflows
+app.get("/api/workflows", async (req, res) => {
+  try {
+    const response = await fetch(`${process.env.N8N_URL}/rest/workflows`, {
+      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `n8n API responded with status ${response.status}`);
+      const text = await response.text();
+      throw new Error(`n8n API Error ${response.status}: ${text}`);
     }
 
-    // Check if the response body is empty (e.g., n8n returns 204 for start/toggle)
-    const contentLength = response.headers.get('content-length');
-    if (response.status === 204 || (contentLength && parseInt(contentLength, 10) === 0)) {
-        return {};
-    }
-
-    return response.json();
-}
-
-// 1. Proxy route to get all workflows: GET /api/workflows
-app.get("/api/workflows", async (req, res) => {
-  try {
-    const data = await proxyN8nRequest('/workflows', 'GET');
+    const data = await response.json();
     res.json(data);
-  } catch (err) {
-    console.error("Error fetching workflows from n8n:", err.message);
-    res.status(500).json({ error: "Failed to connect to n8n, check if n8n is running and .env is correct." });
+  } catch (error) {
+    console.error("❌ Error fetching workflows:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 2. NEW Proxy route to run a workflow: POST /api/workflows/:id/run
+// ✅ 2. Get workflow by ID (details)
+app.get("/api/workflows/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const response = await fetch(`${process.env.N8N_URL}/rest/workflows/${id}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`n8n API Error ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("❌ Error fetching workflow details:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ 3. Trigger a workflow run manually
 app.post("/api/workflows/:id/run", async (req, res) => {
-  const workflowId = req.params.id;
+  const { id } = req.params;
   try {
-    // The actual n8n endpoint for running is /start
-    const data = await proxyN8nRequest(`/workflows/${workflowId}/start`, 'POST');
-    res.json({ success: true, message: "Workflow run triggered.", data });
-  } catch (err) {
-    console.error(`Error running workflow ${workflowId}:`, err.message);
-    res.status(500).json({ error: `Failed to run workflow ${workflowId}: ${err.message}` });
-  }
-});
+    const response = await fetch(`${process.env.N8N_URL}/rest/workflows/${id}/run`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({}), // even if empty
+    });
 
-// 3. NEW Proxy route to toggle a workflow: POST /api/workflows/:id/toggle
-app.post("/api/workflows/:id/toggle", async (req, res) => {
-  const workflowId = req.params.id;
-  const { active } = req.body; // Expecting { active: true } or { active: false } from the frontend
-  const action = active ? "activate" : "deactivate";
+    const data = await response.json();
 
-  try {
-    const data = await proxyN8nRequest(`/workflows/${workflowId}/${action}`, 'POST');
-    res.json({ success: true, message: `Workflow ${workflowId} ${action}d.`, data });
-  } catch (err) {
-    console.error(`Error toggling workflow ${workflowId}:`, err.message);
-    res.status(500).json({ error: `Failed to ${action} workflow ${workflowId}: ${err.message}` });
-  }
-});
-
-// 4. NEW Proxy route to view executions: GET /api/workflows/:id/executions
-app.get("/api/workflows/:id/executions", async (req, res) => {
-  const workflowId = req.params.id;
-  // n8n API filters executions by workflowId
-  try {
-    const data = await proxyN8nRequest(`/executions?filters[workflowId]=${workflowId}`, 'GET');
+    if (!response.ok) throw new Error(data.message || "Run failed");
     res.json(data);
-  } catch (err) {
-    console.error(`Error fetching executions for workflow ${workflowId}:`, err.message);
-    res.status(500).json({ error: `Failed to fetch executions for workflow ${workflowId}: ${err.message}` });
+  } catch (error) {
+    console.error("❌ Failed to trigger run:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
+// ✅ 4. Fetch workflow execution history
+app.get("/api/workflows/:id/executions", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const response = await fetch(`${process.env.N8N_URL}/rest/executions?workflowId=${id}`, {
+      headers: getAuthHeaders(),
+    });
 
-app.listen(PORT, () =>
-  console.log(`✅ Proxy running at http://localhost:${PORT}`)
-);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`n8n API Error ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("❌ Error fetching executions:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ 5. Create new workflow
+app.post("/api/workflows", async (req, res) => {
+  try {
+    const response = await fetch(`${process.env.N8N_URL}/rest/workflows`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(req.body || {}),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`n8n API Error ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("❌ Error creating workflow:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ 6. Settings (scaffold)
+app.get("/api/settings", (req, res) => {
+  res.json({
+    n8nUrl: process.env.N8N_URL,
+    version: "1.0",
+    lastSync: new Date().toISOString(),
+  });
+});
+
+// ✅ 7. Default route
+app.get("/", (req, res) => {
+  res.sendFile("index.html", { root: "./public" });
+});
+
+// -------------------------------------------------------------
+// 🚀 START SERVER
+// -------------------------------------------------------------
+app.listen(PORT, () => {
+  console.log(`✅ Proxy running at http://localhost:${PORT}`);
+});
