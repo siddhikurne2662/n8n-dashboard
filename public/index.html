@@ -3,281 +3,876 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>n8n Workflow Manager Dashboard</title>
+<title>Workflow Manager - Simple & Powerful</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-<link rel="icon" href="favicon.ico" type="image/x-icon">
-
 <style>
-  :root {
-    --color-primary: hsl(14, 98%, 56%);
-    --color-success: hsl(140, 50%, 45%);
-    --color-failure: hsl(350, 70%, 55%);
-    --color-background: #F9FAFB;
-    --color-surface: #FFFFFF;
-    --color-text-dark: #333333;
-    --color-text-light: #9AA5B1;
-    --shadow-soft: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-    --shadow-hover: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.05);
-    --radius-default: 12px;
-  }
-  body { font-family:'Inter','Roboto',sans-serif; background-color: var(--color-background); color: var(--color-text-dark); margin:0; padding-top:60px; transition:background-color 0.3s; }
-  .navbar { position: fixed; top:0; left:0; width:100%; height:60px; background-color: var(--color-surface); box-shadow: var(--shadow-soft); display:flex; align-items:center; justify-content:space-between; padding:0 24px; z-index:1000; }
-  .logo-text { font-size:1.5rem; font-weight:700; color:var(--color-primary); }
-  .main-content { padding:24px; }
-  .workflow-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:24px; }
-  .workflow-card { background-color: var(--color-surface); border-radius: var(--radius-default); box-shadow: var(--shadow-soft); padding:20px; transition:all 0.3s ease; display:flex; flex-direction:column; }
-  .workflow-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
-  .status-pill { display:inline-block; padding:4px 10px; border-radius:9999px; font-size:0.85rem; font-weight:600; margin-left:10px; }
-  .status-active { background-color: var(--color-success); color:white; }
-  .status-inactive { background-color: var(--color-text-light); color: var(--color-surface); }
-  .action-button { background-color:transparent; border:none; color: var(--color-text-dark); cursor:pointer; padding:8px; border-radius:6px; transition: background-color 0.2s; margin-left:8px; }
-  .action-button:hover { background-color: rgba(0,0,0,0.05); }
-  .btn-primary { background-color: var(--color-primary); color:white; padding:10px 15px; border-radius:8px; font-weight:600; transition: background-color 0.2s; }
-  .btn-primary:hover { background-color:hsl(14,85%,50%); }
-  .search-input { padding:8px 12px; border:1px solid #ccc; border-radius:8px; font-size:1rem; width:250px; }
-  .text-subtle { color: var(--color-text-light); font-size:0.9rem; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  /* Modal styling */
-  .modal { position:fixed; top:0; left:0; width:100%; height:100%; background-color: rgba(0,0,0,0.4); display:none; justify-content:center; align-items:center; z-index:2000; }
-  .modal-content { background-color: var(--color-surface); padding:30px; border-radius: var(--radius-default); box-shadow: var(--shadow-hover); max-width:600px; width:90%; max-height:90vh; overflow-y:auto; }
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --bg-light: #f8fafc;
+    --bg-white: #ffffff;
+    --text-dark: #1e293b;
+    --text-gray: #64748b;
+    --border: #e2e8f0;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+    --radius: 12px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-light);
+    color: var(--text-dark);
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .header {
+    background: var(--bg-white);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .logo i {
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--primary), var(--info));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .search-bar {
+    flex: 1;
+    max-width: 500px;
+    position: relative;
+  }
+
+  .search-bar input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    transition: var(--transition);
+    background: var(--bg-light);
+  }
+
+  .search-bar input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--bg-white);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .search-bar i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-gray);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-light);
+    color: var(--text-dark);
+  }
+
+  .btn-icon:hover {
+    background: var(--border);
+  }
+
+  /* Main Content */
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: var(--bg-white);
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    transition: var(--transition);
+  }
+
+  .stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-icon.primary { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
+  .stat-icon.success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+  .stat-icon.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+  .stat-icon.info { background: rgba(59, 130, 246, 0.1); color: var(--info); }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-label {
+    color: var(--text-gray);
+    font-size: 0.9rem;
+  }
+
+  /* Workflow Grid */
+  .workflows-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .workflow-card {
+    background: var(--bg-white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: var(--transition);
+  }
+
+  .workflow-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+    border-color: var(--primary);
+  }
+
+  .workflow-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .workflow-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+  }
+
+  .workflow-id {
+    font-size: 0.85rem;
+    color: var(--text-gray);
+    font-family: 'Courier New', monospace;
+  }
+
+  .status-badge {
+    padding: 0.4rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+  }
+
+  .status-badge.active {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+  }
+
+  .status-badge.inactive {
+    background: rgba(100, 116, 139, 0.1);
+    color: var(--text-gray);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .workflow-body {
+    padding: 1.5rem;
+  }
+
+  .workflow-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-gray);
+  }
+
+  .meta-item i {
+    width: 20px;
+    text-align: center;
+    color: var(--primary);
+  }
+
+  .workflow-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--bg-light);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .action-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: translateY(-2px);
+  }
+
+  .action-btn.run { color: var(--success); }
+  .action-btn.run:hover { background: var(--success); color: white; }
+
+  .action-btn.stop { color: var(--danger); }
+  .action-btn.stop:hover { background: var(--danger); color: white; }
+
+  .action-btn.info { color: var(--info); }
+  .action-btn.info:hover { background: var(--info); color: white; }
+
+  /* Modal */
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .modal.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: var(--bg-white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .modal-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--bg-light);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+  }
+
+  .modal-close:hover {
+    background: var(--danger);
+    color: white;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .form-input,
+  .form-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    transition: var(--transition);
+    background: var(--bg-light);
+  }
+
+  .form-input:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--bg-white);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-gray);
+  }
+
+  .empty-state i {
+    font-size: 4rem;
+    color: var(--border);
+    margin-bottom: 1rem;
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    justify-content: center;
+    padding: 3rem;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header-content {
+      flex-wrap: wrap;
+    }
+
+    .search-bar {
+      order: 3;
+      max-width: 100%;
+    }
+
+    .workflows-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .stats-row {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 </head>
 <body>
 
-<header class="navbar">
-  <div style="display:flex; align-items:center;">
-    <i class="fas fa-cubes" style="color: var(--color-primary); font-size:1.8rem; margin-right:10px;"></i>
-    <span class="logo-text">n8n Manager</span>
-  </div>
-  <nav style="display:flex; gap:20px; font-weight:600;">
-    <a href="#" style="color: var(--color-text-dark); text-decoration:none; border-bottom:2px solid var(--color-primary); padding-bottom:4px;">Workflows</a>
-    <a href="#" id="settingsLink" style="color: var(--color-text-light); text-decoration:none; padding-bottom:4px;">Settings</a>
-  </nav>
-  <div style="display:flex; align-items:center; gap:15px;">
-    <input type="search" placeholder="Search workflows..." class="search-input" id="searchInput">
-    <button class="action-button"><i class="fas fa-moon"></i></button>
+<header class="header">
+  <div class="header-content">
+    <div class="logo">
+      <i class="fas fa-project-diagram"></i>
+      <span>Workflow Hub</span>
+    </div>
+
+    <div class="search-bar">
+      <i class="fas fa-search"></i>
+      <input type="search" id="searchInput" placeholder="Search workflows...">
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-icon" title="Settings" onclick="openSettings()">
+        <i class="fas fa-cog"></i>
+      </button>
+    </div>
   </div>
 </header>
 
-<main class="main-content">
-  <section style="width:100%;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-      <h1 style="font-size:1.8rem;">Workflows</h1>
-      <button class="btn-primary" id="newWorkflowButton"><i class="fas fa-plus" style="margin-right:5px;"></i> New Workflow</button>
+<main class="container">
+  <div class="page-header">
+    <h1 class="page-title">Your Workflows</h1>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon primary">
+        <i class="fas fa-layer-group"></i>
+      </div>
+      <div class="stat-value" id="totalWorkflows">0</div>
+      <div class="stat-label">Total Workflows</div>
     </div>
-    <div class="workflow-grid" id="workflowGrid">
-      <p>Loading workflows...</p>
+
+    <div class="stat-card">
+      <div class="stat-icon success">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div class="stat-value" id="activeWorkflows">0</div>
+      <div class="stat-label">Active Workflows</div>
     </div>
-  </section>
+
+    <div class="stat-card">
+      <div class="stat-icon warning">
+        <i class="fas fa-pause-circle"></i>
+      </div>
+      <div class="stat-value" id="inactiveWorkflows">0</div>
+      <div class="stat-label">Inactive Workflows</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon info">
+        <i class="fas fa-bolt"></i>
+      </div>
+      <div class="stat-value" id="recentRuns">0</div>
+      <div class="stat-label">Recent Executions</div>
+    </div>
+  </div>
+
+  <div class="workflows-grid" id="workflowsGrid">
+    <div class="loading">
+      <div class="spinner"></div>
+    </div>
+  </div>
 </main>
 
-<div id="historyModal" class="modal">
-  <div class="modal-content" id="historyContent"></div>
-</div>
-<div id="confirmModal" class="modal">
-  <div class="modal-content" id="confirmContent"></div>
+<!-- Modal -->
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
 </div>
 
 <script>
-const PROXY_URL_BASE = "http://localhost:4000/api/workflows";
+const API_BASE = 'http://localhost:4000/api/workflows';
 let workflows = [];
 
-/* 🔗 Centralized API Handler */
-async function callProxyApi(path, method='GET', body=null) {
-  const url = PROXY_URL_BASE + path;
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    let msg = await res.text();
-    throw new Error(msg || `HTTP ${res.status}`);
-  }
-  return res.json().catch(() => ({}));
-}
-
-/* 📦 Fetch Workflows */
+// Fetch workflows
 async function loadWorkflows() {
-  const grid = document.getElementById('workflowGrid');
-  grid.innerHTML = '<p>Loading workflows...</p>';
+  const grid = document.getElementById('workflowsGrid');
+
   try {
-    const data = await callProxyApi('');
+    const res = await fetch(API_BASE);
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Server returned ${res.status}: ${errorText}`);
+    }
+
+    const data = await res.json();
     workflows = data.data || [];
+
+    updateStats();
     renderWorkflows();
   } catch (err) {
-    grid.innerHTML = `<p style="color:red;">❌ Failed to load workflows: ${err.message}</p>`;
+    console.error('Load error:', err);
+    grid.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-exclamation-circle"></i>
+        <h3>Failed to load workflows</h3>
+        <p style="color: var(--danger); font-weight: 600;">${err.message}</p>
+        <p style="margin-top: 1rem;">Check console for details</p>
+        <button class="btn btn-primary" onclick="loadWorkflows()" style="margin-top: 1rem;">
+          <i class="fas fa-sync"></i> Retry
+        </button>
+      </div>
+    `;
   }
 }
 
-/* 🧩 Render Workflows */
-function renderWorkflows() {
-  const grid = document.getElementById('workflowGrid');
-  const query = document.getElementById('searchInput').value.toLowerCase();
-  const filtered = workflows.filter(w => (w.name || '').toLowerCase().includes(query));
+// Update statistics
+function updateStats() {
+  const active = workflows.filter(w => w.active).length;
+  document.getElementById('totalWorkflows').textContent = workflows.length;
+  document.getElementById('activeWorkflows').textContent = active;
+  document.getElementById('inactiveWorkflows').textContent = workflows.length - active;
+  document.getElementById('recentRuns').textContent = '—';
+}
 
-  if (!filtered.length) return grid.innerHTML = '<p>No workflows found.</p>';
+// Render workflows
+function renderWorkflows() {
+  const grid = document.getElementById('workflowsGrid');
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = workflows.filter(w =>
+    (w.name || '').toLowerCase().includes(query)
+  );
+
+  if (!filtered.length) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-folder-open"></i>
+        <h3>No workflows found</h3>
+        <p>Try adjusting your search or create a new workflow</p>
+      </div>
+    `;
+    return;
+  }
 
   grid.innerHTML = filtered.map(w => `
     <div class="workflow-card">
-      <div style="display:flex; justify-content:space-between;">
-        <h2>${w.name || 'Untitled'}</h2>
-        <span class="status-pill ${w.active?'status-active':'status-inactive'}">${w.active?'Active':'Inactive'}</span>
+      <div class="workflow-header">
+        <div>
+          <h3 class="workflow-title">${w.name || 'Untitled Workflow'}</h3>
+          <p class="workflow-id">ID: ${w.id}</p>
+        </div>
+        <span class="status-badge ${w.active ? 'active' : 'inactive'}">
+          <span class="status-dot"></span>
+          ${w.active ? 'Active' : 'Inactive'}
+        </span>
       </div>
-      <p class="text-subtle">🆔 ${w.id}</p>
-      <p class="text-subtle">📅 Created: ${new Date(w.createdAt || '').toLocaleString()}</p>
-      <p class="text-subtle">🕓 Updated: ${new Date(w.updatedAt || '').toLocaleString()}</p>
-      <div style="display:flex; justify-content:flex-end; border-top:1px solid #eee; padding-top:10px;">
-        <button class="action-button" title="Run" onclick="runWorkflow('${w.id}')"><i class="fas fa-play"></i></button>
-        <button class="action-button" title="Toggle" onclick="toggleWorkflow('${w.id}', ${w.active})"><i class="fas fa-power-off" style="color:${w.active?'var(--color-failure)':'var(--color-success)'}"></i></button>
-        <button class="action-button" title="History" onclick="viewHistory('${w.id}')"><i class="fas fa-history"></i></button>
-        <button class="action-button" title="Details" onclick="viewDetails('${w.id}')"><i class="fas fa-info-circle"></i></button>
+
+      <div class="workflow-body">
+        <div class="workflow-meta">
+          <div class="meta-item">
+            <i class="fas fa-calendar-plus"></i>
+            <span>Created ${formatDate(w.createdAt)}</span>
+          </div>
+          <div class="meta-item">
+            <i class="fas fa-clock"></i>
+            <span>Updated ${formatDate(w.updatedAt)}</span>
+          </div>
+        </div>
+
+        <div class="workflow-actions">
+          <button class="action-btn run" onclick="runWorkflow('${w.id}')" title="Run workflow">
+            <i class="fas fa-play"></i>
+            Run
+          </button>
+          <button class="action-btn ${w.active ? 'stop' : 'run'}"
+                  onclick="toggleWorkflow('${w.id}', ${w.active})"
+                  title="${w.active ? 'Deactivate' : 'Activate'} workflow">
+            <i class="fas fa-power-off"></i>
+            ${w.active ? 'Stop' : 'Start'}
+          </button>
+          <button class="action-btn info" onclick="viewDetails('${w.id}')" title="View details">
+            <i class="fas fa-info-circle"></i>
+            Info
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
 }
 
-/* ▶️ Run Workflow */
+// Format date
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now - date;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString();
+}
+
+// Run workflow
 async function runWorkflow(id) {
   try {
-    await callProxyApi(`/${id}/run`, 'POST');
-    alert('✅ Workflow triggered successfully');
+    await fetch(`${API_BASE}/${id}/run`, { method: 'POST' });
+    showToast('✅ Workflow started successfully!', 'success');
   } catch (err) {
-    alert('❌ Failed: ' + err.message);
+    showToast('❌ Failed to start workflow', 'error');
   }
 }
 
-/* 🔄 Toggle Activation */
+// Toggle workflow
 async function toggleWorkflow(id, active) {
   try {
-    await callProxyApi(`/${id}/toggle`, 'POST', { active: !active });
-    alert(`Workflow ${!active ? 'activated' : 'deactivated'}`);
+    await fetch(`${API_BASE}/${id}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !active })
+    });
+    showToast(`Workflow ${!active ? 'activated' : 'deactivated'}`, 'success');
     loadWorkflows();
   } catch (err) {
-    alert('❌ Failed: ' + err.message);
+    showToast('❌ Failed to update workflow', 'error');
   }
 }
 
-/* 🕓 View History */
-async function viewHistory(id) {
-  const modal = document.getElementById('historyModal');
-  const content = document.getElementById('historyContent');
-  modal.style.display = 'flex';
-  content.innerHTML = `<h2>History for ${id}</h2><p>Loading...</p>`;
-
-  try {
-    const data = await callProxyApi(`/${id}/executions`);
-    const list = data.data || [];
-    if (!list.length) {
-      content.innerHTML = `<h2>No executions yet.</h2><button onclick="closeModal('historyModal')">Close</button>`;
-      return;
-    }
-
-    content.innerHTML = `
-      <h2>Execution History</h2>
-      <button onclick="closeModal('historyModal')">Close</button>
-      <div style="margin-top:10px;">
-        ${list.map(exe => `
-          <div style="padding:10px; border:1px solid #eee; border-radius:8px; margin-bottom:8px;">
-            <p><b>ID:</b> ${exe.id}</p>
-            <p>Status: ${exe.finished ? '✅ Success' : '⚠️ Failed'}</p>
-            <p>Start: ${new Date(exe.startedAt).toLocaleString()}</p>
-            <p>End: ${exe.stoppedAt ? new Date(exe.stoppedAt).toLocaleString() : '—'}</p>
-          </div>
-        `).join('')}
-      </div>`;
-  } catch (err) {
-    content.innerHTML = `<p style="color:red;">Error loading history: ${err.message}</p>`;
-  }
-}
-
-/* 🧠 View Workflow Details */
+// View details
 function viewDetails(id) {
   const wf = workflows.find(w => w.id === id);
-  const modal = document.getElementById('confirmModal');
-  const content = document.getElementById('confirmContent');
-  modal.style.display = 'flex';
-  content.innerHTML = `
-    <h2>Workflow Details</h2>
-    <p><b>Name:</b> ${wf.name}</p>
-    <p><b>ID:</b> ${wf.id}</p>
-    <p><b>Status:</b> ${wf.active ? '🟢 Active' : '🔴 Inactive'}</p>
-    <p><b>Created:</b> ${new Date(wf.createdAt || '').toLocaleString()}</p>
-    <p><b>Updated:</b> ${new Date(wf.updatedAt || '').toLocaleString()}</p>
-    <button onclick="closeModal('confirmModal')">Close</button>`;
+  showModal('Workflow Details', `
+    <div class="workflow-meta">
+      <div class="meta-item">
+        <i class="fas fa-tag"></i>
+        <strong>Name:</strong> ${wf.name || 'Untitled'}
+      </div>
+      <div class="meta-item">
+        <i class="fas fa-fingerprint"></i>
+        <strong>ID:</strong> ${wf.id}
+      </div>
+      <div class="meta-item">
+        <i class="fas fa-toggle-on"></i>
+        <strong>Status:</strong> ${wf.active ? '🟢 Active' : '🔴 Inactive'}
+      </div>
+      <div class="meta-item">
+        <i class="fas fa-calendar"></i>
+        <strong>Created:</strong> ${new Date(wf.createdAt).toLocaleString()}
+      </div>
+      <div class="meta-item">
+        <i class="fas fa-sync"></i>
+        <strong>Updated:</strong> ${new Date(wf.updatedAt).toLocaleString()}
+      </div>
+    </div>
+    <div style="margin-top: 1.5rem;">
+      <button class="btn btn-primary" onclick="closeModal()">Close</button>
+    </div>
+  `);
 }
 
-/* 🧩 Settings Modal */
-function openSettings() {
-  const modal = document.getElementById('confirmModal');
-  const content = document.getElementById('confirmContent');
-  modal.style.display = 'flex';
-  content.innerHTML = `
-    <h2>⚙️ Settings</h2>
-    <label>API Base URL:</label>
-    <input id="apiBaseInput" type="text" value="http://localhost:4000/api/workflows" style="width:100%;padding:8px;margin-bottom:10px;"/>
-    <label>Auto-Refresh (sec):</label>
-    <input id="refreshInterval" type="number" value="0" min="0" style="width:100%;padding:8px;margin-bottom:10px;"/>
-    <button class="btn-primary" onclick="applySettings()">Save</button>
-    <button style="margin-left:10px;" onclick="closeModal('confirmModal')">Close</button>
-  `;
-}
-
-/* 💾 Apply Settings */
-function applySettings() {
-  const newUrl = document.getElementById('apiBaseInput').value.trim();
-  const interval = parseInt(document.getElementById('refreshInterval').value);
-  if (newUrl) {
-    window.PROXY_URL_BASE = newUrl;
-    alert('✅ Settings updated!');
-    closeModal('confirmModal');
-  }
-  if (interval > 0) {
-    setInterval(loadWorkflows, interval * 1000);
-  }
-}
-
-/* ➕ New Workflow Modal */
+// New workflow
 function openNewWorkflow() {
-  const modal = document.getElementById('confirmModal');
-  const content = document.getElementById('confirmContent');
-  modal.style.display = 'flex';
-  content.innerHTML = `
-    <h2>Create New Workflow</h2>
-    <label>Name:</label>
-    <input id="wfName" type="text" placeholder="Enter workflow name" style="width:100%;padding:8px;margin-bottom:10px;"/>
-    <label>Active:</label>
-    <select id="wfActive" style="width:100%;padding:8px;margin-bottom:15px;">
-      <option value="true">Active</option>
-      <option value="false">Inactive</option>
-    </select>
-    <button class="btn-primary" onclick="createWorkflow()">Create</button>
-    <button style="margin-left:10px;" onclick="closeModal('confirmModal')">Cancel</button>`;
+  showModal('Create New Workflow', `
+    <form onsubmit="createWorkflow(event)">
+      <div class="form-group">
+        <label class="form-label">Workflow Name</label>
+        <input type="text" class="form-input" id="wfName" placeholder="My Awesome Workflow" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="wfActive">
+          <option value="false">Inactive (Recommended for new workflows)</option>
+          <option value="true">Active</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 1;">
+          <i class="fas fa-check"></i> Create Workflow
+        </button>
+        <button type="button" class="btn btn-icon" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+  `);
 }
 
-/* 🆕 Create Workflow */
-async function createWorkflow() {
+// Create workflow
+async function createWorkflow(e) {
+  e.preventDefault();
   const name = document.getElementById('wfName').value;
   const active = document.getElementById('wfActive').value === 'true';
+
   try {
-    await callProxyApi('', 'POST', { name, active, nodes: [], connections: {} });
-    alert('✅ Workflow created!');
-    closeModal('confirmModal');
+    await fetch(API_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, active, nodes: [], connections: {} })
+    });
+    showToast('✅ Workflow created successfully!', 'success');
+    closeModal();
     loadWorkflows();
   } catch (err) {
-    alert('❌ Failed: ' + err.message);
+    showToast('❌ Failed to create workflow', 'error');
   }
 }
 
-/* 🧹 Helpers */
-function closeModal(id) { document.getElementById(id).style.display='none'; }
+// Settings
+function openSettings() {
+  showModal('Settings', `
+    <div class="form-group">
+      <label class="form-label">API Base URL</label>
+      <input type="text" class="form-input" value="${API_BASE}" readonly>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Theme</label>
+      <select class="form-select">
+        <option>Light (Current)</option>
+        <option>Dark (Coming Soon)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="closeModal()">Close</button>
+  `);
+}
 
-/* 🔗 Event Bindings */
+// Modal helpers
+function showModal(title, content) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = content;
+  document.getElementById('modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+// Toast notification
+function showToast(message, type) {
+  alert(message);
+}
+
+// Search
 document.getElementById('searchInput').addEventListener('input', renderWorkflows);
-document.getElementById('settingsLink').addEventListener('click', e => { e.preventDefault(); openSettings(); });
-document.getElementById('newWorkflowButton').addEventListener('click', openNewWorkflow);
 
-/* 🚀 Init */
+// Close modal on outside click
+document.getElementById('modal').addEventListener('click', (e) => {
+  if (e.target.id === 'modal') closeModal();
+});
+
+// Initialize
 loadWorkflows();
 </script>
 
 </body>
-</html
+</html>
