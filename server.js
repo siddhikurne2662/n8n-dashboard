@@ -75,3 +75,38 @@ app.get("/api/workflows/:id/executions", async (req, res) => {
 app.listen(PORT, () =>
   console.log(`✅ Proxy running at http://localhost:${PORT}`)
 );
+// 🟢 Create a new workflow
+app.post("/api/workflows", async (req, res) => {
+  try {
+    const response = await fetch(`${process.env.N8N_URL}/api/v1/workflows`, {
+      method: 'POST',
+      headers: {
+        'X-N8N-API-KEY': process.env.N8N_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: req.body.name || "New Workflow",
+        nodes: req.body.nodes || [],
+        connections: req.body.connections || {},
+        settings: {}
+      })
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔴 Delete a workflow
+app.delete("/api/workflows/:id", async (req, res) => {
+  try {
+    await fetch(`${process.env.N8N_URL}/api/v1/workflows/${req.params.id}`, {
+      method: 'DELETE',
+      headers: { 'X-N8N-API-KEY': process.env.N8N_API_KEY }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
